@@ -27,7 +27,10 @@ warn="-Wall -Wextra -Werror -Wno-unused-parameter -Wno-error=unused-function -Wn
   -Wno-error=zero-length-bounds -Wno-error=cast-function-type -Wno-error=unused-value"
 # clang (macOS's gcc) doesn't know some of GCC's warning names.
 gcc --version 2>/dev/null | grep -q clang && warn="$warn -Wno-unknown-warning-option"
-flags="-std=c99 -Os $warn -I test/c -I $out -I src/c"
+# The screen's size, which the SDK defines for each watch (the Time 2's,
+# emery in pebble_sdk_platform.py).
+platform="-DPBL_DISPLAY_WIDTH=200 -DPBL_DISPLAY_HEIGHT=228"
+flags="-std=c99 -Os $warn $platform -I test/c -I $out -I src/c"
 arm="-mcpu=cortex-m3 -mthumb -ffunction-sections -fdata-sections -fcommon -fPIE -D_TIME_H_ -Dtime_t=long"
 have_arm=$(command -v arm-none-eabi-gcc || true)
 
