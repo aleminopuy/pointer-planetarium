@@ -34,7 +34,7 @@ have_arm=$(command -v arm-none-eabi-gcc || true)
 # the Time 2 (emery), then the Round 2 (gabbro).
 for platform in emery gabbro; do
   case $platform in
-    emery) screen="-DPBL_RECT -DPBL_DISPLAY_WIDTH=200 -DPBL_DISPLAY_HEIGHT=228" ;;
+    emery) screen="-DPBL_RECT -DPBL_RGB_BACKLIGHT -DPBL_DISPLAY_WIDTH=200 -DPBL_DISPLAY_HEIGHT=228" ;;
     gabbro) screen="-DPBL_ROUND -DPBL_DISPLAY_WIDTH=260 -DPBL_DISPLAY_HEIGHT=260" ;;
   esac
   flags="-std=c99 -Os $warn $screen -I test/c -I $out -I src/c"

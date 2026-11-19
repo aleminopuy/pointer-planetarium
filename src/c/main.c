@@ -1,5 +1,5 @@
-// Pointer Planetarium (Pebble Time 2): point at something in the sky with your
-// finger, and the watch tells you what it is.
+// Pointer Planetarium (Pebble Time 2 and Round 2): point at something in the
+// sky with your finger, and the watch tells you what it is.
 //
 // The watch senses, draws and buzzes; the phone does the thinking (see
 // docs/DESIGN.md). One aim goes up as about 60 bytes, the answer comes back
@@ -505,11 +505,14 @@ static bool stargazer(void) {
 }
 
 // Stargazer's backlight: full red (two thirds, tried in 0.16, made the
-// screen too hard to read for what it saved).
+// screen too hard to read for what it saved). Only on a watch whose light
+// can change colour: the SDK doesn't say so of the Round 2.
 #define STAR_LIGHT GColorRed
 
 static void apply_theme(void) {
+#ifdef PBL_RGB_BACKLIGHT
   light_set_color(stargazer() ? STAR_LIGHT : GColorWhite);
+#endif
   window_set_background_color(s_window, palette().bg);
   layer_mark_dirty(s_canvas);
 }
@@ -600,7 +603,9 @@ static void light_handler(bool on) {
 // The system resets the backlight tint whenever something else takes the
 // screen, so set it again right before every reveal.
 static void reveal_light(void) {
+#ifdef PBL_RGB_BACKLIGHT
   light_set_color(stargazer() ? STAR_LIGHT : GColorWhite);
+#endif
   light_enable_interaction();
   light_read_more();
 }
@@ -1691,10 +1696,12 @@ static void draw_result_head(GContext *ctx, Palette p, int start, int icon_type)
     graphics_context_set_stroke_width(ctx, 1);
   }
 #ifdef PBL_ROUND
-  // The circle's too narrow there for the icon beside NO PHONE: the word
-  // goes in its place.
-  int left = s_offline_shown && group_len(start) == 1 ? BAND_L + 4 : BAND_L + 38;
-  if (left != BAND_L + 4)
+  // The circle's too narrow there for the icon and a word beside NO PHONE
+  // (the watch's own answers, which have no pages): the word goes in its
+  // place.
+  bool word_here = s_offline_shown && s_cards[start].word > 0 && s_cards[start].word < 6;
+  int left = word_here ? BAND_L + 4 : BAND_L + 38;
+  if (!word_here)
 #else
   enum { left = BAND_L + 38 };   // where the word starts
 #endif
@@ -4678,7 +4685,7 @@ static void click_config(void *ctx) {
 
 // ---------------------------------------------------------------- touch
 
-// Touch (the Pebble Time 2's screen): drag up or down, drag left or
+// Touch (the Time 2's and Round 2's screens): drag up or down, drag left or
 // right, and tap. The screen follows the finger, so dragging up brings up
 // what's below: on Home and in lists that's DOWN. On Results, up and down
 // go from one answer to the next and left and right through an answer's
