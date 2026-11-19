@@ -1804,7 +1804,8 @@ static void text_line(GContext *ctx, const char *s, GRect box, GColor c) {
 // A hint with its arrow (which way to look, or which way it's going) at
 // y. One line only: "480 mph, moving right"
 // keeps its speed when the words don't fit beside the arrow.
-#define HINT_L PBL_IF_ROUND_ELSE(40, TEXT_X)   // on the Round 2, clear of the circle low down
+#define HINT_L PBL_IF_ROUND_ELSE(40, TEXT_X)            // from here (on the Round 2, clear of the circle low down)
+#define HINT_R PBL_IF_ROUND_ELSE(SCREEN_W - 40, TEXT_X + TEXT_W)   // to here
 static int draw_hint(GContext *ctx, Palette p, const char *hint, int y, bool one_line) {
   double ux, uy;
   int x = HINT_L;
@@ -1814,14 +1815,14 @@ static int draw_hint(GContext *ctx, Palette p, const char *hint, int y, bool one
   }
   char cut[32];
   const char *comma = find_in(hint, ", ");
-  if (one_line && comma && text_w(hint, FONT_KEY_GOTHIC_24_BOLD) > TEXT_X + TEXT_W - x) {
+  if (one_line && comma && text_w(hint, FONT_KEY_GOTHIC_24_BOLD) > HINT_R - x) {
     int n = comma - hint < (int)sizeof(cut) - 1 ? comma - hint : (int)sizeof(cut) - 1;
     memcpy(cut, hint, (size_t)n);
     cut[n] = '\0';
     hint = cut;
   }
-  int h = one_line ? 28 : text_h(hint, FONT_KEY_GOTHIC_24_BOLD, TEXT_X + TEXT_W - x) + 4;
-  text(ctx, hint, FONT_KEY_GOTHIC_24_BOLD, GRect(x, y - 2, TEXT_X + TEXT_W - x, h), p.fg, GTextAlignmentLeft);
+  int h = one_line ? 28 : text_h(hint, FONT_KEY_GOTHIC_24_BOLD, HINT_R - x) + 4;
+  text(ctx, hint, FONT_KEY_GOTHIC_24_BOLD, GRect(x, y - 2, HINT_R - x, h), p.fg, GTextAlignmentLeft);
   return y - 2 + (h > 30 ? h : 30);
 }
 
@@ -1988,7 +1989,7 @@ static void draw_results(GContext *ctx, Palette p) {
   // line goes.
   int rest = (c->l2[0] ? text_h(c->l2, FONT_KEY_GOTHIC_24_BOLD, w) : 0) +
              (c->l3[0] ? text_h(c->l3, FONT_KEY_GOTHIC_24_BOLD, w) : 0) + 6 +
-             (c->hint[0] ? text_h(c->hint, FONT_KEY_GOTHIC_24_BOLD, TEXT_X + TEXT_W - HINT_L - 30) : 0);
+             (c->hint[0] ? text_h(c->hint, FONT_KEY_GOTHIC_24_BOLD, HINT_R - HINT_L - 30) : 0);
   bool drop3 = y + rest > PAGE_END - 2;
   const char *more[2] = { c->l2, drop3 ? "" : c->l3 };
   for (int i = 0; i < 2; i++) {
@@ -2023,18 +2024,18 @@ static void draw_wait(GContext *ctx, Palette p) {
   if (s_wait_list) {
     graphics_context_set_stroke_color(ctx, p.line);
     graphics_context_set_stroke_width(ctx, 3);
-    graphics_draw_arc(ctx, GRect(MID_X - 72, 14, 144, 144), GOvalScaleModeFitCircle, -TRIG_MAX_ANGLE / 4,
+    graphics_draw_arc(ctx, GRect(MID_X - 72, 14 + TOP_DY, 144, 144), GOvalScaleModeFitCircle, -TRIG_MAX_ANGLE / 4,
                       TRIG_MAX_ANGLE / 4);
     graphics_context_set_fill_color(ctx, p.ground);
-    graphics_fill_rect(ctx, GRect(12, 85, SCREEN_W - 24, 4), 0, GCornerNone);
+    graphics_fill_rect(ctx, GRect(12, 85 + TOP_DY, SCREEN_W - 24, 4), 0, GCornerNone);
     // The sweep swings across and back, east to west.
     int32_t sw = sn * (TRIG_MAX_ANGLE / 4) / TRIG_MAX_RATIO;
-    GPoint tip = GPoint(MID_X + 66 * sin_lookup(sw) / TRIG_MAX_RATIO, 86 - 66 * cos_lookup(sw) / TRIG_MAX_RATIO);
+    GPoint tip = GPoint(MID_X + 66 * sin_lookup(sw) / TRIG_MAX_RATIO, 86 + TOP_DY - 66 * cos_lookup(sw) / TRIG_MAX_RATIO);
     graphics_context_set_stroke_color(ctx, p.accent);
-    graphics_draw_line(ctx, GPoint(MID_X, 86), tip);
+    graphics_draw_line(ctx, GPoint(MID_X, 86 + TOP_DY), tip);
     graphics_context_set_stroke_width(ctx, 1);
-    static const GPoint STARS[4] = { { MID_X - 38, 50 }, { MID_X + 28, 34 }, { MID_X - 18, 30 },
-                                     { MID_X + 46, 64 } };
+    static const GPoint STARS[4] = { { MID_X - 38, 50 + TOP_DY }, { MID_X + 28, 34 + TOP_DY },
+                                     { MID_X - 18, 30 + TOP_DY }, { MID_X + 46, 64 + TOP_DY } };
     graphics_context_set_fill_color(ctx, p.fg);
     for (int i = 0; i < 4; i++) graphics_fill_circle(ctx, STARS[i], i == 3 ? 3 : 2);
     big_words(ctx, "SCANNING", "THE SKY", 112 + TOP_DY, p.fg);
@@ -2139,9 +2140,10 @@ static const char *see_note(uint8_t see) {
 
 // Two targets on screen: the name, where it is, and how to see it (a
 // label, filled in the Sun's colour for the Sun's warnings); More below
-// Best now. The kinds (More) are rows as the menu's: three on screen.
-#define PICK_SHOWN 2
-#define PICK_Y     30
+// Best now. The kinds (More) are rows as the menu's: three on screen. On
+// the Round 2, one target with the next one peeking in under it.
+#define PICK_SHOWN PBL_IF_ROUND_ELSE(1, 2)
+#define PICK_Y     PBL_IF_ROUND_ELSE(56, 30)
 #define PICK_STEP  98
 #define PICK_H     94
 
@@ -2237,7 +2239,7 @@ static void draw_pick(GContext *ctx, Palette p) {
   for (int r = 0; r < s_nrows; r++) {
     int ry = g.y0 + r * g.step - sc;
     if (ry + g.h <= g.y0 - 2 || ry >= SCREEN_H) continue;
-    GRect row = GRect(4, ry, TEXT_W, g.h);
+    GRect row = GRect(TEXT_X, ry, TEXT_W, g.h);
     bool sel = r == s_pick_row;
     row_box(ctx, row, sel, p);
     GColor c = sel ? p.bg : p.fg, dim = sel ? p.bg : p.dim;
@@ -2410,9 +2412,9 @@ static void draw_found(GContext *ctx, Palette p, FindTarget *t) {
     graphics_fill_rect(ctx, GRect(0, CAPTION_Y + 4, SCREEN_W, 24), 0, GCornerNone);
   }
   // Now you look up: near the Sun, the warning in place of the name.
-  text(ctx, sun ? "Block the Sun first!" : t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 2, SCREEN_W, 34),
+  text(ctx, sun ? "Block the Sun first!" : t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 2 + FIND_DY, SCREEN_W, 34),
        sun ? p.warn : p.dim, GTextAlignmentCenter);
-  text(ctx, f, big_fits(f, SCREEN_W) ? FONT_36 : FONT_KEY_GOTHIC_28_BOLD, GRect(0, 34, SCREEN_W, 44), p.fg,
+  text(ctx, f, big_fits(f, SCREEN_W) ? FONT_36 : FONT_KEY_GOTHIC_28_BOLD, GRect(0, 34 + FIND_DY, SCREEN_W, 44), p.fg,
        GTextAlignmentCenter);
   const char *bottom = "Tap for more";
   if (chart) {
@@ -2420,33 +2422,35 @@ static void draw_found(GContext *ctx, Palette p, FindTarget *t) {
   } else if (wait) {
     char line[28];
     rises_in(line, sizeof(line), wait);
-    text(ctx, line, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 96, SCREEN_W, 70), p.fg, GTextAlignmentCenter);
+    text(ctx, line, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 96 + FIND_DY, SCREEN_W, 70), p.fg, GTextAlignmentCenter);
     return;
   } else {
-    draw_arrow(ctx, GPoint(MID_X, high ? 150 : 186), 0, -1, high ? 56 : 90, 9, p.accent);
+    draw_arrow(ctx, GPoint(MID_X, (high ? 150 : 186) + FIND_DY), 0, -1, high ? 56 : 90, 9, p.accent);
     // "straight up" or "almost straight up", under "Look up".
-    if (high) text(ctx, look_up(s_fs.talt) + 5, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 152, SCREEN_W, 30), p.fg,
+    if (high) text(ctx, look_up(s_fs.talt) + 5, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 152 + FIND_DY, SCREEN_W, 30), p.fg,
                    GTextAlignmentCenter);
   }
   text(ctx, bottom, FONT_KEY_GOTHIC_24_BOLD, GRect(0, CAPTION_Y, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
 }
 
 // How to find it, before starting: until a tap or SELECT.
+#define FIND_PARA_X PBL_IF_ROUND_ELSE(34, 6)   // how to find it: from here, as far from the right
 static void draw_find_intro(GContext *ctx, Palette p, FindTarget *t) {
-  text(ctx, t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 2, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
+  text(ctx, t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 2 + FIND_DY, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
   bool sun = (t->see & SEE_BLOCK_SUN) && !t->start;   // a rise to wait for: when and where first
-  text_line_al(ctx, sun ? "Block the Sun first!" : t->where, GRect(0, 32, SCREEN_W, 30), sun ? p.warn : p.dim,
+  text_line_al(ctx, sun ? "Block the Sun first!" : t->where, GRect(0, 32 + FIND_DY, SCREEN_W, 30), sun ? p.warn : p.dim,
                GTextAlignmentCenter);
   if (t->start) {
     // A pass to come: the one after it, and what happens.
-    text(ctx, t->note, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 58, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
+    text(ctx, t->note, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 58 + FIND_DY, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
     text(ctx, t->type == T_MOON ? "Point the top of your watch where it will rise. Then follow it up."
                                 : "Point the top of your watch where it will rise. Then follow it across.",
          FONT_KEY_GOTHIC_24_BOLD,
-         GRect(6, 92, SCREEN_W - 12, 104), p.fg, GTextAlignmentLeft);
+         GRect(FIND_PARA_X, 92 + FIND_DY, SCREEN_W - 2 * FIND_PARA_X, 104), p.fg, ROUND_CENTRE);
   } else {
     text(ctx, "Hold your watch as if reading it and point its top at the sky. Turn, then tilt, as the screen says.",
-         FONT_KEY_GOTHIC_24_BOLD, GRect(6, 66, SCREEN_W - 12, 130), p.fg, GTextAlignmentLeft);
+         FONT_KEY_GOTHIC_24_BOLD, GRect(FIND_PARA_X, 66 + FIND_DY, SCREEN_W - 2 * FIND_PARA_X, 130), p.fg,
+         ROUND_CENTRE);
   }
   text(ctx, "Tap to start", FONT_KEY_GOTHIC_24_BOLD, GRect(0, TAP_Y, SCREEN_W, 30), p.accent,
        GTextAlignmentCenter);

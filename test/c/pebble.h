@@ -31,6 +31,14 @@ bool clock_is_24h_style(void);
 
 typedef int32_t status_t;
 
+// tools/check_c.sh defines PBL_ROUND, and the screen's size, for each
+// watch as the SDK does.
+#ifdef PBL_ROUND
+#define PBL_IF_ROUND_ELSE(if_true, if_false) (if_true)
+#else
+#define PBL_IF_ROUND_ELSE(if_true, if_false) (if_false)
+#endif
+
 // ---------------------------------------------------------------- graphics
 typedef union GColor8 {
   uint8_t argb;
