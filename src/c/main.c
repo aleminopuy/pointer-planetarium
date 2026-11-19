@@ -102,8 +102,8 @@
 #define TUNE_NEEDED     3
 #define TUNE_CANT       255 // TUNE_N from the phone: no tuning now (nothing up, no location)
 #define AIM_START_TUNE  255 // AIM_START's layer for a tune aim: no plane fetch
-#define MENU_SHOWN      3   // rows on screen; the rest scroll
-#define MENU_Y          30  // the first row's top, rows MENU_STEP apart, MENU_H high
+#define MENU_SHOWN      PBL_IF_ROUND_ELSE(2, 3)    // rows on screen; the rest scroll
+#define MENU_Y          PBL_IF_ROUND_ELSE(52, 30)  // the first row's top, rows MENU_STEP apart, MENU_H high
 #define MENU_STEP       66
 #define MENU_H          62
 #define PREFS_RETRY_MS  500 // the outbox is busy: send the sky and gear again this soon ...
@@ -663,7 +663,14 @@ static void go(Screen s) {
 #define SCREEN_W PBL_DISPLAY_WIDTH
 #define SCREEN_H PBL_DISPLAY_HEIGHT
 #define MID_X    (SCREEN_W / 2)
-#define TEXT_W   (SCREEN_W - 8)   // text across the screen, 4 pixels in from each side
+// Text across the screen, 4 pixels in from each side. The Round 2's screen
+// is a circle 260 across: its text keeps 24 in, which clears the edge down
+// the page (an answer's, NAME_Y to PAGE_END), and what's at the edge on the
+// Time 2 moves in or is centred. PBL_IF_ROUND_ELSE picks at compile time,
+// so each watch's app has only its own layout.
+#define TEXT_X   PBL_IF_ROUND_ELSE(24, 4)
+#define TEXT_W   (SCREEN_W - 2 * TEXT_X)
+#define ROUND_CENTRE PBL_IF_ROUND_ELSE(GTextAlignmentCenter, GTextAlignmentLeft)
 
 static void text(GContext *ctx, const char *s, const char *font, GRect box, GColor c, GTextAlignment al) {
   graphics_context_set_text_color(ctx, c);
@@ -729,9 +736,12 @@ static void row_box(GContext *ctx, GRect row, bool sel, Palette p) {
   }
 }
 
-// A screen's title, at the top.
+// A screen's title, at the top. On the Round 2 the screens with one start
+// TOP_DY lower, where the circle's wide enough.
+#define TOP_DY PBL_IF_ROUND_ELSE(20, 0)
+#define TAP_Y  (SCREEN_H - PBL_IF_ROUND_ELSE(56, 32))   // "Tap to aim" at the bottom
 static void title(GContext *ctx, const char *s, GColor c) {
-  text(ctx, s, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 0, SCREEN_W, 28), c, GTextAlignmentCenter);
+  text(ctx, s, FONT_KEY_GOTHIC_24_BOLD, GRect(0, TOP_DY, SCREEN_W, 28), c, GTextAlignmentCenter);
 }
 
 static void fill_path(GContext *ctx, GPoint *pts, int n) {
@@ -953,7 +963,8 @@ static bool layer_on(int l) {
 // on, big, by SELECT (which aims with it), and the rungs UP and DOWN go to
 // beside those buttons. The ladder goes round (UP from the top is the
 // bottom); two dots above and below say there are more rungs than shown.
-#define RAIL_X      (SCREEN_W - 30)
+// On the Round 2 it stands in from the edge, inside the curve.
+#define RAIL_X      (SCREEN_W - PBL_IF_ROUND_ELSE(48, 30))
 #define RAIL_MID    (SCREEN_H / 2)   // the SELECT button
 #define RAIL_STEP   70      // to the rungs beside UP and DOWN
 #define RAIL_CUR_R  27      // the disc of the rung you're on ...
@@ -1075,9 +1086,13 @@ static const char *home_status(void) {
 }
 
 // Left of the ladder: the rung's name and its status, level with the disc,
-// and the hint at the bottom.
-#define HOME_X 8
+// and the hint at the bottom (on the Round 2, across the bottom, where the
+// corner would cut it off).
+#define HOME_X PBL_IF_ROUND_ELSE(22, 8)
 #define HOME_W (RAIL_X - RAIL_CUR_R - 6 - HOME_X)
+#define HINT_X PBL_IF_ROUND_ELSE(0, HOME_X)
+#define HINT_W PBL_IF_ROUND_ELSE(SCREEN_W, HOME_W)
+#define HINT_BELOW PBL_IF_ROUND_ELSE(28, 6)   // under the hint
 
 static void draw_home(GContext *ctx, Palette p) {
   int left = slide_left();
@@ -1092,8 +1107,8 @@ static void draw_home(GContext *ctx, Palette p) {
   const char *st = home_status();
   int hs = st[0] ? text_h(st, FONT_KEY_GOTHIC_24_BOLD, HOME_W) : 0;
   const char *hint = s_layer == L_FIND ? "Tap to choose" : s_layer == RUNG_SETTINGS ? "Tap to open" : "Tap to aim";
-  int hh = text_h(hint, FONT_KEY_GOTHIC_24_BOLD, HOME_W);
-  int hint_y = SCREEN_H - 6 - hh;
+  int hh = text_h(hint, FONT_KEY_GOTHIC_24_BOLD, HINT_W);
+  int hint_y = SCREEN_H - HINT_BELOW - hh;
   // Level with the disc (Gothic sits a few pixels low in its box), but
   // clear of the hint.
   int y = RAIL_MID - (hn + hs) / 2 - 4;
@@ -1105,12 +1120,12 @@ static void draw_home(GContext *ctx, Palette p) {
                  (!connection_service_peek_pebble_app_connection() || s_cal != CompassStatusCalibrated);
   text(ctx, st, FONT_KEY_GOTHIC_24_BOLD, GRect(HOME_X, y + hn, HOME_W, hs + 4), trouble ? p.accent : p.fg,
        GTextAlignmentLeft);
-  text(ctx, hint, FONT_KEY_GOTHIC_24_BOLD, GRect(HOME_X, hint_y, HOME_W, hh + 4), p.dim, GTextAlignmentLeft);
+  text(ctx, hint, FONT_KEY_GOTHIC_24_BOLD, GRect(HINT_X, hint_y, HINT_W, hh + 4), p.dim, ROUND_CENTRE);
 }
 
 static void draw_aim(GContext *ctx, Palette p) {
   title(ctx, s_tune ? "TUNE MY AIM" : LAYER_NAMES[sky_layer()], p.dim);
-  GPoint c = GPoint(MID_X, 96);
+  GPoint c = GPoint(MID_X, 96 + TOP_DY);
   graphics_context_set_stroke_color(ctx, p.dim);
   graphics_context_set_stroke_width(ctx, 3);
   graphics_draw_circle(ctx, c, 44);
@@ -1127,29 +1142,29 @@ static void draw_aim(GContext *ctx, Palette p) {
   const char *big = s_phase == AIM_MOVE ? "POINT" : "HOLD STILL";
   const char *small = s_phase == AIM_MOVE ? "with your finger" :
                       s_phase == AIM_SETTLE ? "keep it steady" : "wait for the tick";
-  text(ctx, big, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 150, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
-  text(ctx, small, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 184, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
+  text(ctx, big, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 150 + TOP_DY, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
+  text(ctx, small, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 184 + TOP_DY, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
 }
 
 // The chart (chart.js has the format, with byte offsets X_OFF, Y_OFF): on
 // a chart card under its title, or on the first answer's own page under
 // its name and over its caption.
-#define CHART_X        4
-#define CHART_Y        62
+#define CHART_X        ((SCREEN_W - CHART_W) / 2)
+#define CHART_Y        PBL_IF_ROUND_ELSE(66, 62)
 #define CHART_W        192       // chart.js W
 #define CHART_H        140       // chart.js H_FULL
-#define CHART_INLINE_Y 80
+#define CHART_INLINE_Y PBL_IF_ROUND_ELSE(94, 80)
 #define CHART_INLINE_H 118       // index.js CHART_INLINE_H
 #define CHART_X_OFF    32
 #define CHART_Y_OFF    58
-#define CAPTION_Y      (SCREEN_H - 30)   // a chart's caption, or the Moon's phase
-#define PICTURE_Y      80        // a planet's photo or the Moon, from here down
+#define CAPTION_Y      (SCREEN_H - PBL_IF_ROUND_ELSE(62, 30))   // a chart's caption, or the Moon's phase
+#define PICTURE_Y      PBL_IF_ROUND_ELSE(96, 80)   // a planet's photo or the Moon, from here down
 // A plane's first answer: its name, its route (or type), its chart, then
 // how high and far and how fast and which way, a line each.
-#define ROUTE_Y        80
-#define PLANE_CHART_Y  106
+#define ROUTE_Y        PBL_IF_ROUND_ELSE(94, 80)
+#define PLANE_CHART_Y  PBL_IF_ROUND_ELSE(118, 106)
 #define PLANE_CHART_H  70        // index.js PLANE_CHART_H
-#define PLANE_LINE_Y   172
+#define PLANE_LINE_Y   PBL_IF_ROUND_ELSE(182, 172)
 enum { CHART_TAG_AIM = 1, CHART_TAG_ARROW, CHART_TAG_CAPTION, CHART_TAG_CRAFT, CHART_TAG_ROUTE, CHART_TAG_RIVAL,
        CHART_TAG_DIR };
 // The way you face at a chart's middle (chart.js TAG.DIR), for its ground.
@@ -1394,8 +1409,8 @@ static void draw_ground(GContext *ctx, Palette p, const Chart *c, int y0, int h)
   poly[n++] = GPoint(0, chart_point(c->hz, y0).y);
   for (int i = 0; i < last; i++) poly[n++] = chart_point(c->hz + 2 * i, y0);
   int right = poly[n - 1].y;
-  poly[n++] = GPoint(199, right);
-  poly[n++] = GPoint(199, y0 + h - 1);
+  poly[n++] = GPoint(SCREEN_W - 1, right);
+  poly[n++] = GPoint(SCREEN_W - 1, y0 + h - 1);
   poly[n++] = GPoint(0, y0 + h - 1);
   graphics_context_set_fill_color(ctx, p.ground);
   fill_path(ctx, poly, n);
@@ -1649,10 +1664,22 @@ static bool hint_way(const char *h, double *ux, double *uy) {
 // The band across the top: what it is, how sure ("THAT'S IT",
 // "PROBABLY", "MAYBE"), and this answer's pages as dots (or NO PHONE, for
 // the watch's own answers, which have no pages). The first answer's band
-// is filled, the others' outlined: UP and DOWN go to them.
+// is filled, the others' outlined: UP and DOWN go to them. On the Round 2
+// it's the top of the circle, and what's in it keeps to the width the
+// circle has there.
+#define BAND_TOP  PBL_IF_ROUND_ELSE(-2, 2)   // the band's top, ...
+#define BAND_SIDE PBL_IF_ROUND_ELSE(0, 2)    // ... gap at the sides ...
+#define BAND_H    PBL_IF_ROUND_ELSE(56, 34)  // ... and height
+#define BAND_L    PBL_IF_ROUND_ELSE(48, 2)   // what's in it: from here ...
+#define BAND_R    (SCREEN_W - BAND_L)        // ... to here,
+#define BAND_ROW  PBL_IF_ROUND_ELSE(20, 2)   // ... a line from here down
+#define BAND_ICON GPoint(BAND_L + 19, BAND_ROW + 17)
+// Under it: an answer's name, then its lines, down to PAGE_END.
+#define NAME_Y    PBL_IF_ROUND_ELSE(62, 40)
+#define PAGE_END  (SCREEN_H - PBL_IF_ROUND_ELSE(50, 0))
 static void draw_result_head(GContext *ctx, Palette p, int start, int icon_type) {
   bool first = start == 0;
-  GRect band = GRect(2, 2, SCREEN_W - 4, 34);
+  GRect band = GRect(BAND_SIDE, BAND_TOP, SCREEN_W - 2 * BAND_SIDE, BAND_H);
   GColor ink = first ? p.bg : p.fg;
   if (first) {
     graphics_context_set_fill_color(ctx, p.accent);
@@ -1660,23 +1687,31 @@ static void draw_result_head(GContext *ctx, Palette p, int start, int icon_type)
   } else {
     graphics_context_set_stroke_color(ctx, p.line);
     graphics_context_set_stroke_width(ctx, 2);
-    graphics_draw_round_rect(ctx, GRect(3, 3, SCREEN_W - 6, 32), 8);
+    graphics_draw_round_rect(ctx, GRect(BAND_SIDE + 1, BAND_TOP + 1, SCREEN_W - 2 * BAND_SIDE - 2, BAND_H - 2), 8);
     graphics_context_set_stroke_width(ctx, 1);
   }
-  draw_icon(ctx, icon_for_type(icon_type), GPoint(21, 19), 12, ink, first ? p.accent : p.bg);
-  int right = SCREEN_W - 4;   // where the dots or the chip start
+#ifdef PBL_ROUND
+  // The circle's too narrow there for the icon beside NO PHONE: the word
+  // goes in its place.
+  int left = s_offline_shown && group_len(start) == 1 ? BAND_L + 4 : BAND_L + 38;
+  if (left != BAND_L + 4)
+#else
+  enum { left = BAND_L + 38 };   // where the word starts
+#endif
+  draw_icon(ctx, icon_for_type(icon_type), BAND_ICON, 12, ink, first ? p.accent : p.bg);
+  int right = BAND_R - 2;   // where the dots or the chip start
   int len = group_len(start);
   if (len > 1) {
     for (int i = 0; i < len; i++) {
       bool on = start + i == s_card;
       graphics_context_set_fill_color(ctx, ink);
-      graphics_fill_circle(ctx, GPoint(SCREEN_W - 14 - (len - 1 - i) * 16, 19), on ? 5 : 2);
+      graphics_fill_circle(ctx, GPoint(BAND_R - 12 - (len - 1 - i) * 16, BAND_ROW + 17), on ? 5 : 2);
     }
-    right = SCREEN_W - 14 - (len - 1) * 16 - 8;
+    right = BAND_R - 12 - (len - 1) * 16 - 8;
   } else if (s_offline_shown) {
     int w = text_w("NO PHONE", FONT_KEY_GOTHIC_18_BOLD) + 12;
-    chip(ctx, "NO PHONE", SCREEN_W - 8 - w, 7, false, ink, ink);
-    right = SCREEN_W - 8 - w;
+    chip(ctx, "NO PHONE", BAND_R - 6 - w, BAND_ROW + 5, false, ink, ink);
+    right = BAND_R - 6 - w;
   }
   uint8_t word = s_cards[start].word;
   if (word > 0 && word < 6) {
@@ -1684,9 +1719,9 @@ static void draw_result_head(GContext *ctx, Palette p, int start, int icon_type)
     char said[16];
     snprintf(said, sizeof(said), "%s%s", start > first_answer() ? "or " : "", WORDS[word]);
     // Smaller beside NO PHONE, where the big one doesn't fit.
-    bool big = 40 + text_w(said, FONT_KEY_GOTHIC_24_BOLD) <= right - 4;
-    text(ctx, said, big ? FONT_KEY_GOTHIC_24_BOLD : FONT_KEY_GOTHIC_18_BOLD, GRect(40, big ? 2 : 6, right - 40, 30),
-         ink, GTextAlignmentLeft);
+    bool big = left + text_w(said, FONT_KEY_GOTHIC_24_BOLD) <= right - 4;
+    text(ctx, said, big ? FONT_KEY_GOTHIC_24_BOLD : FONT_KEY_GOTHIC_18_BOLD,
+         GRect(left, BAND_ROW + (big ? 0 : 4), right - left, 30), ink, GTextAlignmentLeft);
   }
 }
 
@@ -1703,7 +1738,7 @@ static void draw_reveal(GContext *ctx, Palette p) {
   int r = 15 + 220 * rest / REVEAL_MS * rest / REVEAL_MS;
   graphics_context_set_stroke_color(ctx, p.accent);
   graphics_context_set_stroke_width(ctx, 3);
-  graphics_draw_circle(ctx, GPoint(21, 19), (uint16_t)r);
+  graphics_draw_circle(ctx, BAND_ICON, (uint16_t)r);
   graphics_context_set_stroke_width(ctx, 1);
 }
 
@@ -1741,7 +1776,7 @@ static void draw_name_line(GContext *ctx, Palette p, const char *s) {
   // Gothic sits low in its box: up a little, more for the bigger font.
   int lift = size == 36 ? 6 : size == 28 ? 2 : 0;
   graphics_context_set_text_color(ctx, p.fg);
-  graphics_draw_text(ctx, s, fonts_get_system_font(font), GRect(4, 40 - lift, TEXT_W, 42),
+  graphics_draw_text(ctx, s, fonts_get_system_font(font), GRect(TEXT_X, NAME_Y - lift, TEXT_W, 42),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 }
 
@@ -1751,7 +1786,7 @@ static int draw_name(GContext *ctx, Palette p, const Card *c, int y) {
   const char *font = big ? FONT_36 : FONT_KEY_GOTHIC_28_BOLD;
   int h = text_h(c->l1, font, TEXT_W);
   int lift = big ? 6 : 4;
-  text(ctx, c->l1, font, GRect(4, y - lift, TEXT_W, h + 4), c->type == T_SUN ? p.warn : p.fg, GTextAlignmentLeft);
+  text(ctx, c->l1, font, GRect(TEXT_X, y - lift, TEXT_W, h + 4), c->type == T_SUN ? p.warn : p.fg, GTextAlignmentLeft);
   return y + h - lift + 2;
 }
 
@@ -1769,33 +1804,34 @@ static void text_line(GContext *ctx, const char *s, GRect box, GColor c) {
 // A hint with its arrow (which way to look, or which way it's going) at
 // y. One line only: "480 mph, moving right"
 // keeps its speed when the words don't fit beside the arrow.
+#define HINT_L PBL_IF_ROUND_ELSE(40, TEXT_X)   // on the Round 2, clear of the circle low down
 static int draw_hint(GContext *ctx, Palette p, const char *hint, int y, bool one_line) {
   double ux, uy;
-  int x = 4;
+  int x = HINT_L;
   if (hint_way(hint, &ux, &uy)) {
-    draw_arrow(ctx, GPoint(16 - (int)(ux * 9), y + 14 - (int)(uy * 9)), ux, uy, 10, 3, p.fg);
-    x = 34;
+    draw_arrow(ctx, GPoint(HINT_L + 12 - (int)(ux * 9), y + 14 - (int)(uy * 9)), ux, uy, 10, 3, p.fg);
+    x = HINT_L + 30;
   }
   char cut[32];
   const char *comma = find_in(hint, ", ");
-  if (one_line && comma && text_w(hint, FONT_KEY_GOTHIC_24_BOLD) > SCREEN_W - 4 - x) {
+  if (one_line && comma && text_w(hint, FONT_KEY_GOTHIC_24_BOLD) > TEXT_X + TEXT_W - x) {
     int n = comma - hint < (int)sizeof(cut) - 1 ? comma - hint : (int)sizeof(cut) - 1;
     memcpy(cut, hint, (size_t)n);
     cut[n] = '\0';
     hint = cut;
   }
-  int h = one_line ? 28 : text_h(hint, FONT_KEY_GOTHIC_24_BOLD, SCREEN_W - 4 - x) + 4;
-  text(ctx, hint, FONT_KEY_GOTHIC_24_BOLD, GRect(x, y - 2, SCREEN_W - 4 - x, h), p.fg, GTextAlignmentLeft);
+  int h = one_line ? 28 : text_h(hint, FONT_KEY_GOTHIC_24_BOLD, TEXT_X + TEXT_W - x) + 4;
+  text(ctx, hint, FONT_KEY_GOTHIC_24_BOLD, GRect(x, y - 2, TEXT_X + TEXT_W - x, h), p.fg, GTextAlignmentLeft);
   return y - 2 + (h > 30 ? h : 30);
 }
 
 // A plane's route between its airports' codes, how far along it is
 // filled in.
 static void draw_route(GContext *ctx, Palette p, const Chart *ch, int y) {
-  int wa = chip(ctx, ch->from, 4, y, false, p.dim, p.bg);
+  int wa = chip(ctx, ch->from, TEXT_X, y, false, p.dim, p.bg);
   int wz = text_w(ch->to, FONT_KEY_GOTHIC_18_BOLD) + 12;
-  chip(ctx, ch->to, SCREEN_W - 4 - wz, y, false, p.dim, p.bg);
-  int x0 = 4 + wa + 6, x1 = SCREEN_W - 4 - wz - 6, my = y + CHIP_H / 2;
+  chip(ctx, ch->to, TEXT_X + TEXT_W - wz, y, false, p.dim, p.bg);
+  int x0 = TEXT_X + wa + 6, x1 = TEXT_X + TEXT_W - wz - 6, my = y + CHIP_H / 2;
   if (x1 - x0 < 10) return;
   int xs = x0 + (x1 - x0) * ch->route_share / 255;
   graphics_context_set_stroke_width(ctx, 3);
@@ -1812,8 +1848,10 @@ static void draw_route(GContext *ctx, Palette p, const Chart *ch, int y) {
 // or above FOOTER_Y): on any of the first answer's pages, what else it
 // might be ("or Vega, Sheliak", below); on the last page of all, how
 // to aim again.
-#define FOOTER_Y       (SCREEN_H - 30)
-#define FOOTER_W       (SCREEN_W - 30)   // "or ..." beside its arrow
+#define FOOTER_Y       (SCREEN_H - PBL_IF_ROUND_ELSE(62, 30))
+#define FOOT_X         PBL_IF_ROUND_ELSE(44, 4)                // from here ...
+#define FOOT_R         (SCREEN_W - PBL_IF_ROUND_ELSE(44, 2))   // ... to here
+#define FOOTER_W       (FOOT_R - FOOT_X - 24)   // "or ..." beside its arrow
 
 // What the footer says on this page (out, cap bytes); false for none.
 // is_or: it's the "or ..." line (the answers after the first, by name).
@@ -1849,21 +1887,22 @@ static void draw_footer(GContext *ctx, Palette p, int bottom) {
   bool is_or;
   if (bottom > FOOTER_Y || !footer_text(line, sizeof(line), &is_or)) return;
   if (!is_or) {
-    text(ctx, line, FONT_KEY_GOTHIC_24_BOLD, GRect(4, FOOTER_Y, TEXT_W, 30), p.dim, GTextAlignmentLeft);
+    text(ctx, line, FONT_KEY_GOTHIC_24_BOLD, GRect(FOOT_X, FOOTER_Y, FOOT_R - FOOT_X - 2, 30), p.dim, ROUND_CENTRE);
     return;
   }
   // An arrow down: the way to them.
-  GPoint tri[3] = { GPoint(5, FOOTER_Y + 11), GPoint(19, FOOTER_Y + 11), GPoint(12, FOOTER_Y + 19) };
+  GPoint tri[3] = { GPoint(FOOT_X + 1, FOOTER_Y + 11), GPoint(FOOT_X + 15, FOOTER_Y + 11),
+                    GPoint(FOOT_X + 8, FOOTER_Y + 19) };
   graphics_context_set_fill_color(ctx, p.accent);
   fill_path(ctx, tri, 3);
-  text_line(ctx, line, GRect(24, FOOTER_Y, SCREEN_W - 24 - 2, 30), p.accent);
+  text_line(ctx, line, GRect(FOOT_X + 20, FOOTER_Y, FOOT_R - FOOT_X - 20, 30), p.accent);
 }
 
 static void draw_results(GContext *ctx, Palette p) {
   if (s_ncards == 0) return;
   Card *c = &s_cards[s_card];
   int start = group_start(s_card);
-  int y = 40, w = TEXT_W;
+  int y = NAME_Y, w = TEXT_W;
   int vis = answer_visual(s_card);
   Chart ch;
   if ((c->type == T_CHART || vis == VIS_CHART) && chart_parse(&ch)) {
@@ -1874,7 +1913,7 @@ static void draw_results(GContext *ctx, Palette p) {
     // caption go on top.
     draw_chart(ctx, p, &ch, y0, h);
     graphics_context_set_fill_color(ctx, p.bg);
-    graphics_fill_rect(ctx, GRect(0, 0, SCREEN_W, here ? y0 - 2 : 38), 0, GCornerNone);
+    graphics_fill_rect(ctx, GRect(0, 0, SCREEN_W, here ? y0 - 2 : NAME_Y - 2), 0, GCornerNone);
     if (plane) graphics_fill_rect(ctx, GRect(0, y0 + h, SCREEN_W, SCREEN_H - y0 - h), 0, GCornerNone);
     else if (here && ch.caption[0]) graphics_fill_rect(ctx, GRect(0, CAPTION_Y + 4, SCREEN_W, 24), 0, GCornerNone);
     draw_result_head(ctx, p, start, s_cards[start].type);
@@ -1883,16 +1922,16 @@ static void draw_results(GContext *ctx, Palette p) {
     if (plane) {
       draw_name_line(ctx, p, c->l1);
       if (ch.route) draw_route(ctx, p, &ch, ROUTE_Y);
-      else text_line(ctx, c->l2, GRect(4, ROUTE_Y - 6, w, 30), p.dim);
-      text_line(ctx, ch.caption[0] ? ch.caption : c->l3, GRect(4, PLANE_LINE_Y, w, 30), ch.caption[0] ? cap : p.dim);
+      else text_line(ctx, c->l2, GRect(TEXT_X, ROUTE_Y - 6, w, 30), p.dim);
+      text_line(ctx, ch.caption[0] ? ch.caption : c->l3, GRect(TEXT_X, PLANE_LINE_Y, w, 30), ch.caption[0] ? cap : p.dim);
       if (c->hint[0]) draw_hint(ctx, p, c->hint, PLANE_LINE_Y + 26, true);
     } else if (here) {
       draw_name_line(ctx, p, c->l1);
-      text(ctx, ch.caption, FONT_KEY_GOTHIC_24_BOLD, GRect(4, CAPTION_Y, w, 30), cap, GTextAlignmentLeft);
+      text(ctx, ch.caption, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, CAPTION_Y, w, 30), cap, ROUND_CENTRE);
       if (!ch.caption[0]) draw_footer(ctx, p, y0 + h);
     } else {
-      text(ctx, c->l1, FONT_KEY_GOTHIC_24_BOLD, GRect(4, 34, w, 28), p.fg, GTextAlignmentLeft);
-      text(ctx, c->l2, FONT_KEY_GOTHIC_24_BOLD, GRect(4, CAPTION_Y, w, 30), p.dim, GTextAlignmentLeft);
+      text(ctx, c->l1, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, NAME_Y - 6, w, 28), p.fg, ROUND_CENTRE);
+      text(ctx, c->l2, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, CAPTION_Y, w, 30), p.dim, ROUND_CENTRE);
     }
     return;
   }
@@ -1906,12 +1945,13 @@ static void draw_results(GContext *ctx, Palette p) {
     int h = text_h(s_fact, FONT_KEY_GOTHIC_24_BOLD, w);
     char line[64];
     bool is_or;
-    int end = footer_text(line, sizeof(line), &is_or) && y - 2 + h <= FOOTER_Y ? FOOTER_Y : SCREEN_H;
-    if (h <= end - 66) {
-      text(ctx, "Did you know?", FONT_KEY_GOTHIC_24_BOLD, GRect(4, 34, w, 28), p.accent, GTextAlignmentLeft);
-      y = 64;
+    int end = footer_text(line, sizeof(line), &is_or) && y - 2 + h <= FOOTER_Y ? FOOTER_Y : PAGE_END;
+    if (h <= end - NAME_Y - 26) {
+      text(ctx, "Did you know?", FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, NAME_Y - 6, w, 28), p.accent,
+           GTextAlignmentLeft);
+      y = NAME_Y + 24;
     }
-    text(ctx, s_fact, FONT_KEY_GOTHIC_24_BOLD, GRect(4, y - 2, w, SCREEN_H - y + 2), p.fg, GTextAlignmentLeft);
+    text(ctx, s_fact, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, y - 2, w, PAGE_END - y + 2), p.fg, GTextAlignmentLeft);
     draw_footer(ctx, p, y - 2 + h);
     return;
   }
@@ -1920,14 +1960,14 @@ static void draw_results(GContext *ctx, Palette p) {
     GBitmap *b = art(moon ? RESOURCE_ID_MOON : planet_res(c->l1), moon ? s_moon_look : NULL);
     if (b) {
       draw_name_line(ctx, p, c->l1);
-      int bottom = moon ? CAPTION_Y : SCREEN_H - 2;
-      draw_picture(ctx, p, b, GRect(4, PICTURE_Y, TEXT_W, bottom - PICTURE_Y), moon);
-      if (moon) text(ctx, c->l2, FONT_KEY_GOTHIC_24_BOLD, GRect(4, CAPTION_Y, w, 30), p.dim, GTextAlignmentLeft);
+      int bottom = moon ? CAPTION_Y : PAGE_END - 2;
+      draw_picture(ctx, p, b, GRect(TEXT_X, PICTURE_Y, TEXT_W, bottom - PICTURE_Y), moon);
+      if (moon) text(ctx, c->l2, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, CAPTION_Y, w, 30), p.dim, ROUND_CENTRE);
       // Which way to look, as the hint's arrow in the corner (a disc
       // leaves the corners clear).
       double ux, uy;
       if (hint_way(c->hint, &ux, &uy)) {
-        GPoint at = GPoint(22 - (int)(ux * 9), bottom - 20 - (int)(uy * 9));
+        GPoint at = GPoint(TEXT_X + 18 - (int)(ux * 9), bottom - 20 - (int)(uy * 9));
         draw_arrow(ctx, at, ux, uy, 10, 3, theme_now() == THEME_DAY ? GColorWhite : p.fg);
       }
       return;
@@ -1937,10 +1977,10 @@ static void draw_results(GContext *ctx, Palette p) {
   if (vis == VIS_FACT) {
     if (c->l2[0]) {
       int h = text_h(c->l2, FONT_KEY_GOTHIC_24_BOLD, w);
-      text(ctx, c->l2, FONT_KEY_GOTHIC_24_BOLD, GRect(4, y - 2, w, h + 4), p.dim, GTextAlignmentLeft);
+      text(ctx, c->l2, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, y - 2, w, h + 4), p.dim, GTextAlignmentLeft);
       y += h;
     }
-    text(ctx, s_fact, FONT_KEY_GOTHIC_24_BOLD, GRect(4, y + 2, w, SCREEN_H - y - 2), p.fg, GTextAlignmentLeft);
+    text(ctx, s_fact, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, y + 2, w, PAGE_END - y - 2), p.fg, GTextAlignmentLeft);
     draw_footer(ctx, p, y + 2 + text_h(s_fact, FONT_KEY_GOTHIC_24_BOLD, w));
     return;
   }
@@ -1948,13 +1988,13 @@ static void draw_results(GContext *ctx, Palette p) {
   // line goes.
   int rest = (c->l2[0] ? text_h(c->l2, FONT_KEY_GOTHIC_24_BOLD, w) : 0) +
              (c->l3[0] ? text_h(c->l3, FONT_KEY_GOTHIC_24_BOLD, w) : 0) + 6 +
-             (c->hint[0] ? text_h(c->hint, FONT_KEY_GOTHIC_24_BOLD, SCREEN_W - 38) : 0);
-  bool drop3 = y + rest > SCREEN_H - 2;
+             (c->hint[0] ? text_h(c->hint, FONT_KEY_GOTHIC_24_BOLD, TEXT_X + TEXT_W - HINT_L - 30) : 0);
+  bool drop3 = y + rest > PAGE_END - 2;
   const char *more[2] = { c->l2, drop3 ? "" : c->l3 };
   for (int i = 0; i < 2; i++) {
     if (!more[i][0]) continue;
     int h = text_h(more[i], FONT_KEY_GOTHIC_24_BOLD, w);
-    text(ctx, more[i], FONT_KEY_GOTHIC_24_BOLD, GRect(4, y - 2, w, h + 4), p.dim, GTextAlignmentLeft);
+    text(ctx, more[i], FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, y - 2, w, h + 4), p.dim, GTextAlignmentLeft);
     y += h;
   }
   y += 6;
@@ -1973,7 +2013,7 @@ static void big_words(GContext *ctx, const char *a, const char *b, int y, GColor
 // plainly working. After an aim: a moon going round a planet, CHECKING
 // THE CHARTS. Opening Find it: a line sweeping the sky, SCANNING THE SKY.
 #define WAIT_TURN_MS 2400
-#define ORBIT_Y      62
+#define ORBIT_Y      (62 + TOP_DY)
 static void draw_wait(GContext *ctx, Palette p) {
   int32_t a = (int32_t)((uint32_t)now_ms() % WAIT_TURN_MS) * TRIG_MAX_ANGLE / WAIT_TURN_MS;   // 32-bit: no 64-bit division linked
 #ifdef SKY_SHOT
@@ -1997,7 +2037,7 @@ static void draw_wait(GContext *ctx, Palette p) {
                                      { MID_X + 46, 64 } };
     graphics_context_set_fill_color(ctx, p.fg);
     for (int i = 0; i < 4; i++) graphics_fill_circle(ctx, STARS[i], i == 3 ? 3 : 2);
-    big_words(ctx, "SCANNING", "THE SKY", 112, p.fg);
+    big_words(ctx, "SCANNING", "THE SKY", 112 + TOP_DY, p.fg);
     return;
   }
   // The orbit: dots round a tilted ring, the moon behind the planet on
@@ -2019,7 +2059,7 @@ static void draw_wait(GContext *ctx, Palette p) {
       graphics_fill_circle(ctx, GPoint(MID_X, ORBIT_Y), 16);
     }
   }
-  big_words(ctx, "CHECKING", "THE CHARTS", 112, p.fg);
+  big_words(ctx, "CHECKING", "THE CHARTS", 112 + TOP_DY, p.fg);
 }
 
 // ---------------------------------------------------------------- Find it: drawing
@@ -2220,8 +2260,8 @@ static void draw_pick(GContext *ctx, Palette p) {
     }
     FindTarget *t = &s_find[i];
     draw_icon(ctx, icon_for_type(t->type), GPoint(x + 20, y + 19), 12, c, sel ? p.accent : p.bg);
-    row_name(ctx, t->name, x + 38, y, 150, c);
-    text_line(ctx, t->where, GRect(x + 8, y + 30, 180, 30), dim);   // one line: the label goes under it
+    row_name(ctx, t->name, x + 38, y, TEXT_W - 42, c);
+    text_line(ctx, t->where, GRect(x + 8, y + 30, TEXT_W - 12, 30), dim);   // one line: the label goes under it
     const char *note = see_note(t->see);
     if (note) {
       bool sun = t->see & (SEE_NEAR_SUN | SEE_BLOCK_SUN);
@@ -2239,10 +2279,18 @@ static void draw_pick(GContext *ctx, Palette p) {
 // points under the pointer. Up the right: height above the horizon. The
 // target is a diamond on each (a chevron at the end, past it); a tape
 // that's on fills in.
+// On the Round 2 the compass tape is lower and shorter, and the height
+// tape further in, inside the circle; the words move down with them.
 #define TAPE_PX     2             // pixels per degree
-#define HTAPE       GRect(4, 4, TEXT_W, 34)
-#define VTAPE       GRect(SCREEN_W - 36, 84, 32, 140)
-#define BESIDE_VTAPE (SCREEN_W - 44)   // the width left of it, for words
+#define HTAPE_X     PBL_IF_ROUND_ELSE(54, TEXT_X)
+#define HTAPE_Y     PBL_IF_ROUND_ELSE(26, 4)
+#define HTAPE       GRect(HTAPE_X, HTAPE_Y, SCREEN_W - 2 * HTAPE_X, 34)
+#define VTAPE_X     (SCREEN_W - PBL_IF_ROUND_ELSE(60, 36))
+#define VTAPE_Y     PBL_IF_ROUND_ELSE(64, 84)
+#define VTAPE       GRect(VTAPE_X, VTAPE_Y, 32, 140)
+#define FIND_DY     PBL_IF_ROUND_ELSE(22, 0)    // the words, this much lower
+#define BESIDE_L    PBL_IF_ROUND_ELSE(TEXT_X, 0)   // words left of the height tape, from here ...
+#define BESIDE_W    (VTAPE_X - 8 - BESIDE_L)       // ... this wide
 
 static void draw_diamond(GContext *ctx, GPoint c, int r, GColor col) {
   GPoint pts[4] = { { c.x, c.y - r }, { c.x + r, c.y }, { c.x, c.y + r }, { c.x - r, c.y } };
@@ -2308,7 +2356,7 @@ static void draw_tapes(GContext *ctx, Palette p, double az, double alt) {
         }
       } else {
         int x = r.origin.x + r.size.w / 2 + off;
-        graphics_draw_line(ctx, GPoint(x, major ? 26 : 30), GPoint(x, 36));
+        graphics_draw_line(ctx, GPoint(x, HTAPE_Y + (major ? 22 : 26)), GPoint(x, HTAPE_Y + 32));
       }
     }
     if (!v) {
@@ -2316,19 +2364,19 @@ static void draw_tapes(GContext *ctx, Palette p, double az, double alt) {
       for (int k = 0; k < 8; k++) {
         int off = (int)(sky_wrap180(k * 45 - now) * TAPE_PX);
         if (off > -half + 6 && off < half - 6) {
-          text(ctx, POINTS[k], FONT_KEY_GOTHIC_18_BOLD, GRect(MID_X + off - 16, 3, 32, 22), ink, GTextAlignmentCenter);
+          text(ctx, POINTS[k], FONT_KEY_GOTHIC_18_BOLD, GRect(MID_X + off - 16, HTAPE_Y - 1, 32, 22), ink, GTextAlignmentCenter);
         }
       }
     }
     graphics_context_set_stroke_width(ctx, 1);
-    GPoint mid = v ? GPoint(r.origin.x + 22, r.origin.y + r.size.h / 2) : GPoint(MID_X, 29);
+    GPoint mid = v ? GPoint(r.origin.x + 22, r.origin.y + r.size.h / 2) : GPoint(MID_X, HTAPE_Y + 25);
     draw_tape_mark(ctx, mid, !v, mark, half, on ? p.bg : p.accent);
   }
   // The pointers: where the top of the watch points.
   graphics_context_set_fill_color(ctx, p.fg);
-  GPoint top[3] = { { MID_X, 38 }, { MID_X - 7, 47 }, { MID_X + 7, 47 } };
+  GPoint top[3] = { { MID_X, HTAPE_Y + 34 }, { MID_X - 7, HTAPE_Y + 43 }, { MID_X + 7, HTAPE_Y + 43 } };
   fill_path(ctx, top, 3);
-  GPoint side[3] = { { SCREEN_W - 36, 154 }, { SCREEN_W - 45, 147 }, { SCREEN_W - 45, 161 } };
+  GPoint side[3] = { { VTAPE_X, VTAPE_Y + 70 }, { VTAPE_X - 9, VTAPE_Y + 63 }, { VTAPE_X - 9, VTAPE_Y + 77 } };
   fill_path(ctx, side, 3);
 }
 
@@ -2400,7 +2448,7 @@ static void draw_find_intro(GContext *ctx, Palette p, FindTarget *t) {
     text(ctx, "Hold your watch as if reading it and point its top at the sky. Turn, then tilt, as the screen says.",
          FONT_KEY_GOTHIC_24_BOLD, GRect(6, 66, SCREEN_W - 12, 130), p.fg, GTextAlignmentLeft);
   }
-  text(ctx, "Tap to start", FONT_KEY_GOTHIC_24_BOLD, GRect(0, SCREEN_H - 32, SCREEN_W, 30), p.accent,
+  text(ctx, "Tap to start", FONT_KEY_GOTHIC_24_BOLD, GRect(0, TAP_Y, SCREEN_W, 30), p.accent,
        GTextAlignmentCenter);
 }
 
@@ -2441,17 +2489,17 @@ static void draw_find(GContext *ctx, Palette p) {
   if (big || !s_fs.have) {
     if (t->see & SEE_BLOCK_SUN) title(ctx, "Block the Sun first!", p.warn);
     else title(ctx, "FIND IT", p.dim);
-    text(ctx, t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 24, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
-    text_line_al(ctx, t->where, GRect(0, 54, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
+    text(ctx, t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 24 + FIND_DY, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
+    text_line_al(ctx, t->where, GRect(0, 54 + FIND_DY, SCREEN_W, 30), p.dim, GTextAlignmentCenter);
     if (!big) return;
-    text(ctx, big, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 90, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
-    text(ctx, small, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 124, SCREEN_W, 60), p.dim, GTextAlignmentCenter);
+    text(ctx, big, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 90 + FIND_DY, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
+    text(ctx, small, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 124 + FIND_DY, SCREEN_W, 60), p.dim, GTextAlignmentCenter);
     return;
   }
   // One step at a time: face it, then tilt up to it (or, overhead, look up).
   bool high = s_fs.talt > HIGH_ALT;
   draw_tapes(ctx, p, s_show_az, s_show_alt);
-  text(ctx, t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 44, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
+  text(ctx, t->name, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 44 + FIND_DY, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
   const char *step = "Hold it";
   double by = 0;
   bool plus = false;   // right or up
@@ -2465,23 +2513,24 @@ static void draw_find(GContext *ctx, Palette p) {
     step = plus ? "Tilt up" : "Tilt down";
     by = s_fs.talt - s_show_alt;
   }
-  text(ctx, step, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 92, BESIDE_VTAPE, 34), p.fg, GTextAlignmentCenter);
+  text(ctx, step, FONT_KEY_GOTHIC_28_BOLD, GRect(BESIDE_L, 92 + FIND_DY, BESIDE_W, 34), p.fg, GTextAlignmentCenter);
   if (plus ? by >= 0.5 : by <= -0.5) {   // none for "Hold it", nor while gliding past
     char n[8];
     snprintf(n, sizeof(n), "%d\xc2\xb0", (int)(by < 0 ? -by + 0.5 : by + 0.5));
-    bool b36 = big_fits(n, BESIDE_VTAPE);
-    text(ctx, n, b36 ? FONT_36 : FONT_KEY_GOTHIC_28_BOLD, GRect(0, 124, BESIDE_VTAPE, 44), p.fg, GTextAlignmentCenter);
+    bool b36 = big_fits(n, BESIDE_W);
+    text(ctx, n, b36 ? FONT_36 : FONT_KEY_GOTHIC_28_BOLD, GRect(BESIDE_L, 124 + FIND_DY, BESIDE_W, 44), p.fg, GTextAlignmentCenter);
   }
   int32_t wait = find_wait_s(t);
   if (wait) {
     char line[28];
     rises_in(line, sizeof(line), wait);
-    text(ctx, line, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 166, BESIDE_VTAPE, 60), p.dim, GTextAlignmentCenter);
+    text(ctx, line, FONT_KEY_GOTHIC_24_BOLD, GRect(BESIDE_L, 166 + FIND_DY, BESIDE_W, 60), p.dim, GTextAlignmentCenter);
   } else if (high) {
     text(ctx, s_fs.facing ? look_up(s_fs.talt) : "then look up", FONT_KEY_GOTHIC_24_BOLD,
-         GRect(0, 166, BESIDE_VTAPE, 60), p.dim, GTextAlignmentCenter);
+         GRect(BESIDE_L, 166 + FIND_DY, BESIDE_W, 60), p.dim, GTextAlignmentCenter);
   } else if (t->see & SEE_BLOCK_SUN) {
-    chip(ctx, "BLOCK THE SUN", 6, SCREEN_H - 32, false, p.warn, p.warn);
+    chip(ctx, "BLOCK THE SUN", PBL_IF_ROUND_ELSE(MID_X - 60, 6), SCREEN_H - PBL_IF_ROUND_ELSE(62, 32), false, p.warn,
+         p.warn);
   }
 }
 
@@ -2494,13 +2543,13 @@ static GPoint coach_point(int step) {
   int32_t den = TRIG_MAX_RATIO + s2 * s2 / (TRIG_MAX_RATIO / 4);
   int32_t x = 70 * c / den;
   int32_t y = 70 * (s2 * c2 / (TRIG_MAX_RATIO / 4)) / den;
-  return GPoint(MID_X + x, 84 + y);
+  return GPoint(MID_X + x, 84 + TOP_DY + y);
 }
 
 static void draw_coach(GContext *ctx, Palette p) {
   title(ctx, "CALIBRATE COMPASS", p.dim);
   if (s_coach_done) {
-    text(ctx, "Compass ready!", FONT_KEY_GOTHIC_28_BOLD, GRect(0, 90, SCREEN_W, 34), p.accent, GTextAlignmentCenter);
+    text(ctx, "Compass ready!", FONT_KEY_GOTHIC_28_BOLD, GRect(0, 90 + TOP_DY, SCREEN_W, 34), p.accent, GTextAlignmentCenter);
     return;
   }
   graphics_context_set_stroke_color(ctx, p.dim);
@@ -2520,7 +2569,7 @@ static void draw_coach(GContext *ctx, Palette p) {
                     secs < 10 ? "Draw a big 8 in the air with your watch" :
                     secs < 20 ? "Keep drawing the 8" :
                     secs < 30 ? "Bigger loops!" : "Step away from cars and metal";
-  text(ctx, tip, FONT_KEY_GOTHIC_28_BOLD, GRect(4, 140, TEXT_W, 80), p.fg, GTextAlignmentCenter);
+  text(ctx, tip, FONT_KEY_GOTHIC_28_BOLD, GRect(TEXT_X, 140 + TOP_DY, TEXT_W, 80), p.fg, GTextAlignmentCenter);
 }
 
 // The menu's rows, the ones changed most often first.
@@ -2555,7 +2604,7 @@ static void draw_menu(GContext *ctx, Palette p) {
   for (int i = 0; i < g.n; i++) {
     int ry = MENU_Y + i * MENU_STEP - sc;
     if (ry + MENU_H <= MENU_Y - 2 || ry >= SCREEN_H) continue;
-    GRect row = GRect(4, ry, TEXT_W, MENU_H);
+    GRect row = GRect(TEXT_X, ry, TEXT_W, MENU_H);
     bool sel = i == s_menu_row;
     row_box(ctx, row, sel, p);
     GColor c = sel ? p.bg : p.fg;
@@ -2572,44 +2621,54 @@ static void draw_menu(GContext *ctx, Palette p) {
 // A three-way question (first run, a new place): the question at the top,
 // then the answers, each with a line on what it means; the one chosen
 // filled.
+// On the Round 2 the three answers are closer together and narrower, so
+// the third clears the circle too.
+#define CHOICE_X    PBL_IF_ROUND_ELSE(34, TEXT_X)
+#define CHOICE_Y    PBL_IF_ROUND_ELSE(48, MENU_Y)
+#define CHOICE_STEP PBL_IF_ROUND_ELSE(58, MENU_STEP)
+#define CHOICE_H    PBL_IF_ROUND_ELSE(56, MENU_H)
 static void draw_choice(GContext *ctx, Palette p) {
   bool sky = s_choice == CHOICE_SKY;
   title(ctx, sky ? (s_choice_place ? "Where are you now?" : "Where are you?") : "What do you look with?", p.fg);
   for (int i = 0; i < 3; i++) {
-    GRect row = GRect(4, MENU_Y + i * MENU_STEP, TEXT_W, MENU_H);
+    GRect row = GRect(CHOICE_X, CHOICE_Y + i * CHOICE_STEP, SCREEN_W - 2 * CHOICE_X, CHOICE_H);
     bool sel = i == s_choice_row;
     row_box(ctx, row, sel, p);
     text(ctx, sky ? SKY_NAMES[i] : GEAR_NAMES[i], FONT_KEY_GOTHIC_28_BOLD,
-         GRect(row.origin.x + 10, row.origin.y - 2, TEXT_W - 16, 34), sel ? p.bg : p.fg, GTextAlignmentLeft);
+         GRect(row.origin.x + 10, row.origin.y - 2, SCREEN_W - 2 * CHOICE_X - 16, 34), sel ? p.bg : p.fg, GTextAlignmentLeft);
     text(ctx, sky ? SKY_NOTES[i] : GEAR_NOTES[i], FONT_KEY_GOTHIC_24_BOLD,
-         GRect(row.origin.x + 10, row.origin.y + 28, TEXT_W - 16, 30), sel ? p.bg : p.dim, GTextAlignmentLeft);
+         GRect(row.origin.x + 10, row.origin.y + 28, SCREEN_W - 2 * CHOICE_X - 16, 30), sel ? p.bg : p.dim, GTextAlignmentLeft);
   }
 }
 
 // A label beside a button on the right edge, with a small pointer to it.
+#define ACTION_R PBL_IF_ROUND_ELSE(22, 3)   // the pointer's tip, this far in from the edge
 static void draw_action(GContext *ctx, const char *label, int cy, Palette p) {
-  text(ctx, label, FONT_KEY_GOTHIC_28_BOLD, GRect(40, cy - 19, SCREEN_W - 60, 34), p.accent, GTextAlignmentRight);
-  GPoint tri[3] = { GPoint(SCREEN_W - 14, cy - 8), GPoint(SCREEN_W - 3, cy), GPoint(SCREEN_W - 14, cy + 8) };
+  text(ctx, label, FONT_KEY_GOTHIC_28_BOLD, GRect(40, cy - 19, SCREEN_W - ACTION_R - 57, 34), p.accent,
+       GTextAlignmentRight);
+  GPoint tri[3] = { GPoint(SCREEN_W - ACTION_R - 11, cy - 8), GPoint(SCREEN_W - ACTION_R, cy),
+                    GPoint(SCREEN_W - ACTION_R - 11, cy + 8) };
   graphics_context_set_fill_color(ctx, p.accent);
   fill_path(ctx, tri, 3);
 }
 
-#define ACTION_UP_Y    34
-#define ACTION_DOWN_Y  (SCREEN_H - 36)
+#define ACTION_UP_Y    PBL_IF_ROUND_ELSE(66, 34)
+#define ACTION_DOWN_Y  (SCREEN_H - PBL_IF_ROUND_ELSE(66, 36))
+#define QUESTION_Y     PBL_IF_ROUND_ELSE(22, 0)   // the question, this much lower
 
 static void draw_intro(GContext *ctx, Palette p) {
   switch (s_intro_step) {
     case INTRO_WRIST:
       draw_action(ctx, "Left wrist", ACTION_UP_Y, p);
-      text(ctx, "Which wrist is your watch on?", FONT_KEY_GOTHIC_28_BOLD, GRect(4, 70, SCREEN_W - 24, 100), p.fg,
-           GTextAlignmentLeft);
+      text(ctx, "Which wrist is your watch on?", FONT_KEY_GOTHIC_28_BOLD,
+           GRect(TEXT_X, 70 + QUESTION_Y, TEXT_W - 16, 100), p.fg, ROUND_CENTRE);
       draw_action(ctx, "Right wrist", ACTION_DOWN_Y, p);
       break;
     default:
-      draw_icon(ctx, ICON_STAR, GPoint(MID_X, 46), 24, p.accent, p.bg);
-      text(ctx, "All set!", FONT_KEY_GOTHIC_28_BOLD, GRect(0, 78, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
+      draw_icon(ctx, ICON_STAR, GPoint(MID_X, 46 + TOP_DY), 24, p.accent, p.bg);
+      text(ctx, "All set!", FONT_KEY_GOTHIC_28_BOLD, GRect(0, 78 + TOP_DY, SCREEN_W, 34), p.fg, GTextAlignmentCenter);
       text(ctx, "Tap, point at the sky, and hold still until it ticks", FONT_KEY_GOTHIC_24_BOLD,
-           GRect(8, 116, SCREEN_W - 16, 90), p.fg, GTextAlignmentCenter);
+           GRect(TEXT_X + 4, 116 + TOP_DY, TEXT_W - 8, 90), p.fg, GTextAlignmentCenter);
       break;
   }
 }
@@ -2619,9 +2678,9 @@ static void draw_intro(GContext *ctx, Palette p) {
 static void draw_wristq(GContext *ctx, Palette p) {
   draw_action(ctx, "Yes", ACTION_UP_Y, p);
   text(ctx, s_wrist ? "Is your watch on your RIGHT wrist?" : "Is your watch on your LEFT wrist?",
-       FONT_KEY_GOTHIC_28_BOLD, GRect(4, 58, SCREEN_W - 24, 100), p.fg, GTextAlignmentLeft);
-  text(ctx, "Aims point at the ground", FONT_KEY_GOTHIC_24_BOLD, GRect(4, 122, SCREEN_W - 24, 56), p.dim,
-       GTextAlignmentLeft);
+       FONT_KEY_GOTHIC_28_BOLD, GRect(TEXT_X, 58 + QUESTION_Y, TEXT_W - 16, 100), p.fg, ROUND_CENTRE);
+  text(ctx, "Aims point at the ground", FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, 122 + QUESTION_Y, TEXT_W - 16, 56), p.dim,
+       ROUND_CENTRE);
   draw_action(ctx, "No", ACTION_DOWN_Y, p);
 }
 
@@ -2629,13 +2688,13 @@ static void draw_tune(GContext *ctx, Palette p) {
   title(ctx, "TUNE MY AIM", p.dim);
   static char line[48];
   snprintf(line, sizeof(line), "Point at %s", s_tune_tgt);
-  int y = 32, w = TEXT_W;
+  int y = 32 + TOP_DY, w = TEXT_W;
   int h = text_h(line, FONT_KEY_GOTHIC_28_BOLD, w);
-  text(ctx, line, FONT_KEY_GOTHIC_28_BOLD, GRect(4, y, w, h + 4), p.fg, GTextAlignmentCenter);
+  text(ctx, line, FONT_KEY_GOTHIC_28_BOLD, GRect(TEXT_X, y, w, h + 4), p.fg, GTextAlignmentCenter);
   y += h + 4;
   if (s_tune_where[0]) {
     h = text_h(s_tune_where, FONT_KEY_GOTHIC_24_BOLD, w);
-    text(ctx, s_tune_where, FONT_KEY_GOTHIC_24_BOLD, GRect(4, y, w, h + 4), p.dim, GTextAlignmentCenter);
+    text(ctx, s_tune_where, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, y, w, h + 4), p.dim, GTextAlignmentCenter);
     y += h + 4;
   }
   // One dot per aim, filled once the phone has it.
@@ -2651,31 +2710,33 @@ static void draw_tune(GContext *ctx, Palette p) {
   graphics_context_set_stroke_width(ctx, 1);
   y += 18;
   if (s_tune_note[0]) {
-    text(ctx, s_tune_note, FONT_KEY_GOTHIC_24_BOLD, GRect(4, y, w, SCREEN_H - y), p.accent, GTextAlignmentCenter);
+    text(ctx, s_tune_note, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, y, w, PAGE_END - y), p.accent, GTextAlignmentCenter);
   } else {
-    text(ctx, "Tap to aim", FONT_KEY_GOTHIC_24_BOLD, GRect(0, SCREEN_H - 32, SCREEN_W, 30), p.dim,
+    text(ctx, "Tap to aim", FONT_KEY_GOTHIC_24_BOLD, GRect(0, TAP_Y, SCREEN_W, 30), p.dim,
          GTextAlignmentCenter);
   }
 }
 
 static void draw_msg(GContext *ctx, Palette p) {
-  text(ctx, s_msg1, FONT_KEY_GOTHIC_28_BOLD, GRect(4, 70, TEXT_W, 70), p.fg, GTextAlignmentCenter);
-  text(ctx, s_msg2, FONT_KEY_GOTHIC_24_BOLD, GRect(4, 136, TEXT_W, 60), p.dim, GTextAlignmentCenter);
+  text(ctx, s_msg1, FONT_KEY_GOTHIC_28_BOLD, GRect(TEXT_X, 70 + TOP_DY, TEXT_W, 70), p.fg, GTextAlignmentCenter);
+  text(ctx, s_msg2, FONT_KEY_GOTHIC_24_BOLD, GRect(TEXT_X, 136 + TOP_DY, TEXT_W, 60), p.dim, GTextAlignmentCenter);
 }
 
 // That there are more answers: a rail down the right edge (the one strip
 // no page draws on), a mark per answer, this one's bright and wider. This
 // answer's other pages are the dots in its band.
-#define RAIL_TOP 42
-#define RAIL_LEN (SCREEN_H - 2 - RAIL_TOP)
+// On the Round 2 it's in from the edge, and shorter, inside the circle.
+#define RAIL_TOP PBL_IF_ROUND_ELSE(80, 42)
+#define RAIL_LEN PBL_IF_ROUND_ELSE(100, SCREEN_H - 2 - RAIL_TOP)
 #define RAIL_GAP 4
+#define RAIL_IN  PBL_IF_ROUND_ELSE(16, 0)
 static void draw_page_cue(GContext *ctx, Palette p) {
   int n = group_count(), k = group_index(group_start(s_card));
   if (n < 2) return;
   int seg = (RAIL_LEN - (n - 1) * RAIL_GAP) / n;
   for (int i = 0; i < n; i++) {
     graphics_context_set_fill_color(ctx, i == k ? p.accent : p.line);
-    graphics_fill_rect(ctx, GRect(i == k ? SCREEN_W - 5 : SCREEN_W - 4, RAIL_TOP + i * (seg + RAIL_GAP), i == k ? 5 : 3,
+    graphics_fill_rect(ctx, GRect(i == k ? SCREEN_W - 5 - RAIL_IN : SCREEN_W - 4 - RAIL_IN, RAIL_TOP + i * (seg + RAIL_GAP), i == k ? 5 : 3,
                                   seg), 1, GCornersAll);
   }
 }
@@ -2873,7 +2934,7 @@ static void place_fact(void) {
   int h = text_h(c->l1, big_fits(c->l1, TEXT_W) ? FONT_36 : FONT_KEY_GOTHIC_28_BOLD, TEXT_W) +
           (c->l2[0] ? text_h(c->l2, FONT_KEY_GOTHIC_24_BOLD, TEXT_W) : 0) +
           text_h(s_fact, FONT_KEY_GOTHIC_24_BOLD, TEXT_W);
-  if (40 + h > SCREEN_H - 4) return;
+  if (NAME_Y + h > PAGE_END - 4) return;
   memmove(&s_cards[at], &s_cards[at + 1], (size_t)(s_ncards - at - 1) * sizeof(Card));
   s_ncards--;
   s_fact_inline = true;
@@ -4782,8 +4843,8 @@ static int row_at(int y, int y0, int step, int h, int scroll, int n) {
 
 // The wrist questions' answers sit by UP (top) and DOWN (bottom); a tap on
 // the question between them is nothing.
-#define ANSWER_TOP_Y    64
-#define ANSWER_BOTTOM_Y 164
+#define ANSWER_TOP_Y    (64 + QUESTION_Y)
+#define ANSWER_BOTTOM_Y (164 + PBL_IF_ROUND_ELSE(QUESTION_Y - 30, 0))
 
 static bool touch_tap(GPoint at) {
   int row = -1;
@@ -4804,7 +4865,7 @@ static bool touch_tap(GPoint at) {
       break;
     }
     case SCR_CHOICE:
-      if ((row = row_at(at.y, MENU_Y, MENU_STEP, MENU_H, 0, 3)) < 0) return false;
+      if ((row = row_at(at.y, CHOICE_Y, CHOICE_STEP, CHOICE_H, 0, 3)) < 0) return false;
       s_choice_row = row;
       break;
     default:
