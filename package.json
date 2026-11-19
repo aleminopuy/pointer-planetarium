@@ -12,7 +12,7 @@
     "sdkVersion": "3",
     "enableMultiJS": true,
     "capabilities": ["configurable", "location"],
-    "targetPlatforms": ["emery"],
+    "targetPlatforms": ["emery", "gabbro"],
     "watchapp": {
       "watchface": false
     },
