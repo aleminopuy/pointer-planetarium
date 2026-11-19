@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **The Pebble Round 2.** Pointer Planetarium now runs on the Round 2 as
+  well as the Time 2, with every screen laid out for the round screen:
+  headings sit lower and centred, the sky ladder and the answer rail
+  stand in from the edge, lists show a row or two with the next peeking
+  in under them, and Find it's tapes stay inside the circle. On the Time 2
+  nothing changes. On the Round 2, Stargazer's light stays white: the
+  Pebble SDK doesn't give its light a colour to change to.
+
+<img src="https://github.com/hornofabraxas/pointer-planetarium/raw/main/docs/screenshots/round-home.png" width="200" alt="The home screen on a Round 2"> <img src="https://github.com/hornofabraxas/pointer-planetarium/raw/main/docs/screenshots/round-answer.png" width="200" alt="An answer on a Round 2: probably Vega"> <img src="https://github.com/hornofabraxas/pointer-planetarium/raw/main/docs/screenshots/round-find-it.png" width="200" alt="Find it on a Round 2: turn right to Saturn">
+
 ## 1.1 (2026-10-14)
 
 From the first reports from outside the US: a planet "not there" when it

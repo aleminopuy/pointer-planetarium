@@ -1,7 +1,7 @@
 # Pointer Planetarium
 
 Point at something in the sky with your finger, and your Pebble Time 2
-tells you what it is.
+or Round 2 tells you what it is.
 
 <p>
 <img src="docs/screenshots/home.png" width="200" alt="The home screen">
@@ -14,6 +14,12 @@ tells you what it is.
 <img src="docs/screenshots/found-it.png" width="200" alt="Found it">
 <img src="docs/screenshots/plane.png" width="200" alt="A plane with its route">
 <img src="docs/screenshots/stargazer.png" width="200" alt="The red Stargazer theme">
+</p>
+<p>
+<img src="docs/screenshots/round-home.png" width="200" alt="The home screen on a Round 2">
+<img src="docs/screenshots/round-answer.png" width="200" alt="An answer on a Round 2: probably Vega">
+<img src="docs/screenshots/round-planet.png" width="200" alt="Saturn on a Round 2">
+<img src="docs/screenshots/round-find-it.png" width="200" alt="Find it on a Round 2: turn right to Saturn">
 </p>
 
 Pointer Planetarium knows:
@@ -35,8 +41,8 @@ It's free and open source, with no ads, no accounts and no tracking.
 
 ## What you need
 
-- A **Pebble Time 2**. (It's made for the Time 2's color touch screen and
-  doesn't run on other Pebbles.)
+- A **Pebble Time 2** or a **Pebble Round 2**. (It's made for their color
+  touch screens and compasses, and doesn't run on other Pebbles.)
 - The **Pebble app** on your phone, with location allowed for Pointer
   Planetarium. Your phone does the sky math and downloads satellite and
   plane data, so the phone needs to be nearby. Without it, the watch can
@@ -202,7 +208,8 @@ The menu (the SETTINGS rung, or hold SELECT on the home screen) has:
 
 - **Sky** and **Gear**: where you are and what you look with.
 - **Theme**: **Day** (white), **Night** (black), **Stargazer** (red on
-  black with a red light, to keep your eyes adjusted to the dark), or
+  black, with a red light on the Time 2, to keep your eyes adjusted to
+  the dark), or
   **Auto**, which switches to Night or Stargazer after sunset. Until you
   pick one, a dark sky gets Auto (Stargazer).
 - **Keep light on**: the watch's light normally turns off after a few
