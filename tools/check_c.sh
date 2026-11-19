@@ -27,32 +27,38 @@ warn="-Wall -Wextra -Werror -Wno-unused-parameter -Wno-error=unused-function -Wn
   -Wno-error=zero-length-bounds -Wno-error=cast-function-type -Wno-error=unused-value"
 # clang (macOS's gcc) doesn't know some of GCC's warning names.
 gcc --version 2>/dev/null | grep -q clang && warn="$warn -Wno-unknown-warning-option"
-# The screen's size, which the SDK defines for each watch (the Time 2's,
-# emery in pebble_sdk_platform.py).
-platform="-DPBL_DISPLAY_WIDTH=200 -DPBL_DISPLAY_HEIGHT=228"
-flags="-std=c99 -Os $warn $platform -I test/c -I $out -I src/c"
 arm="-mcpu=cortex-m3 -mthumb -ffunction-sections -fdata-sections -fcommon -fPIE -D_TIME_H_ -Dtime_t=long"
 have_arm=$(command -v arm-none-eabi-gcc || true)
 
-# The release build, in full, warnings shown.
-for f in src/c/*.c; do
-  gcc $flags -c "$f" -o "$out/host.o"
+# Each watch, with the screen the SDK defines for it (pebble_sdk_platform.py):
+# the Time 2 (emery), then the Round 2 (gabbro).
+for platform in emery gabbro; do
+  case $platform in
+    emery) screen="-DPBL_RECT -DPBL_RGB_BACKLIGHT -DPBL_DISPLAY_WIDTH=200 -DPBL_DISPLAY_HEIGHT=228" ;;
+    gabbro) screen="-DPBL_ROUND -DPBL_DISPLAY_WIDTH=260 -DPBL_DISPLAY_HEIGHT=260" ;;
+  esac
+  flags="-std=c99 -Os $warn $screen -I test/c -I $out -I src/c"
+
+  # The release build, in full, warnings shown.
+  for f in src/c/*.c; do
+    gcc $flags -c "$f" -o "$out/host.o"
+    if [ -n "$have_arm" ]; then
+      arm-none-eabi-gcc $flags $arm -c "$f" -o "$out/$(basename "$f" .c).o"
+    fi
+  done
+  # Every screenshot build, with the computer's compiler at -Os (so warnings
+  # that need optimisation show), main.c only (the others don't use
+  # SKY_SHOT); quiet unless it fails.
+  for shot in 1 2 3 4 5 6 7 9 10 11 12 13 14 15 16 17 18 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73; do
+    gcc $flags -DSKY_SHOT=$shot -c src/c/main.c -o "$out/shot.o" 2> "$out/err" || { cat "$out/err"; exit 1; }
+  done
+  # ... and one with touch put back in (SKY_TOUCH).
+  gcc $flags -DSKY_SHOT=72 -DSKY_TOUCH -c src/c/main.c -o "$out/shot.o" 2> "$out/err" || { cat "$out/err"; exit 1; }
+  echo "watch code type-checks ($platform)"
   if [ -n "$have_arm" ]; then
-    arm-none-eabi-gcc $flags $arm -c "$f" -o "$out/$(basename "$f" .c).o"
+    arm-none-eabi-size "$out"/main.o "$out"/sky.o "$out"/offline.o
   fi
 done
-# Every screenshot build, with the computer's compiler at -Os (so warnings
-# that need optimisation show), main.c only (the others don't use
-# SKY_SHOT); quiet unless it fails.
-for shot in 1 2 3 4 5 6 7 9 10 11 12 13 14 15 16 17 18 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73; do
-  gcc $flags -DSKY_SHOT=$shot -c src/c/main.c -o "$out/shot.o" 2> "$out/err" || { cat "$out/err"; exit 1; }
-done
-# ... and one with touch put back in (SKY_TOUCH).
-gcc $flags -DSKY_SHOT=72 -DSKY_TOUCH -c src/c/main.c -o "$out/shot.o" 2> "$out/err" || { cat "$out/err"; exit 1; }
-echo "watch code type-checks"
-if [ -n "$have_arm" ]; then
-  arm-none-eabi-size "$out"/main.o "$out"/sky.o "$out"/offline.o
-fi
 
 for t in test/c/*_test.c; do
   [ -e "$t" ] || continue
